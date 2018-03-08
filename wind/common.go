@@ -7,7 +7,11 @@ import (
 	"fmt"
 	"strings"
 )
-
+var Binary = `
++-+-+-+-+-+-+
+|Q|-|w|i|n|d|
++-+-+-+-+-+-+
+`
 var RunFlag = true
 
 var cipherDic = map[string]uint16{

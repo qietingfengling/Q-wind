@@ -153,9 +153,10 @@ func Run() {
 		}()
 	}
 
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetHeader([]string{"Elapsed", "total", "Completed", "Requests per second [sed]", "Failed requests", "Clients", "Duration"})
+	//table := tablewriter.NewWriter(os.Stdout)
+	//table.SetAlignment(tablewriter.ALIGN_LEFT)
+	//table.SetHeader([]string{"Elapsed", "total", "Completed", "Requests per second [sed]", "Failed requests", "Clients", "Duration"})
+	fmt.Printf("|%-10s|%-10s|%-10s|%-30s|%-20s|%-10s|%-10s|\n", "Elapsed", "total", "Completed", "Requests per second [sed]", "Failed requests", "Clients", "Duration")
 	go func() {
 		for t := range ticker.C {
 			elapsed := time.Since(t1)
@@ -175,13 +176,17 @@ func Run() {
 			}
 			rDurTime := "+" + strconv.FormatInt(sample, 10) + "s"
 			dur, _ := time.ParseDuration(rDurTime)
-			table.Append([]string{fmt.Sprintf("%0.1fs", elapsed.Seconds()), fmt.Sprintf("%v", total),
+			fmt.Printf("|%-10s|%-10s|%-10s|%-30s|%-20s|%-10s|%-10s|\n", fmt.Sprintf("%0.1fs", elapsed.Seconds()), fmt.Sprintf("%v", total),
 				fmt.Sprintf("%v", doneReq), fmt.Sprintf("%v", reqPerSec), fmt.Sprintf("%v", failedReqPerSec),
-				fmt.Sprintf("%v", alive), fmt.Sprintf("%v", dur)})
-			table.Render()
+				fmt.Sprintf("%v", alive), fmt.Sprintf("%v", dur))
 			if process == total {
 				done <- 1
+				break
 			}
+			//table.Append([]string{fmt.Sprintf("%0.1fs", elapsed.Seconds()), fmt.Sprintf("%v", total),
+			//	fmt.Sprintf("%v", doneReq), fmt.Sprintf("%v", reqPerSec), fmt.Sprintf("%v", failedReqPerSec),
+			//	fmt.Sprintf("%v", alive), fmt.Sprintf("%v", dur)})
+			//table.Render()
 		}
 	}()
 	<-done
@@ -199,5 +204,6 @@ func Run() {
 	resultTable.Append([]string{"Total transferred", fmt.Sprintf("%v bytes", totalTransferred)})
 	resultTable.Append([]string{"Transfer rate", fmt.Sprintf("%v [bytes/sec] received", totalTransferred/int64(elapsed.Seconds()))})
 	resultTable.Render()
+	fmt.Println(Binary)
 
 }

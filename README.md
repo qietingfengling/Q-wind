@@ -55,3 +55,6 @@ It can customize the number of requests, pressure measurement time, header, prox
 ### Protocols Support
     http1
     http2
+
+### Header Support
+    clientId:test-client,token:123
