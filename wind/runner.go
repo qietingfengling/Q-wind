@@ -15,9 +15,11 @@ import (
 	"time"
 	"net/http"
 	"net"
+	"bufio"
 )
 
 func init() {
+	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 100
 	runtime.GOMAXPROCS(runtime.NumCPU())
 }
 
@@ -26,6 +28,18 @@ func Run() {
 	done := make(chan int, 0)
 	l := rate.NewLimiter(rate.Limit(*r), *burst)
 	c, _ := context.WithCancel(context.TODO())
+	urlList := make([]string, 0)
+	if *filePath != "" {
+		f, _ := os.Open(*filePath)
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			t := scanner.Text()
+			if len(t) > 0 {
+				urlList = append(urlList, t)
+			}
+		}
+	}
 	go func(limitrate *rate.Limiter, can *context.Context) {
 		if *timeLimit != 0 {
 			tt := time.After(time.Second * time.Duration(*timeLimit))
@@ -36,14 +50,44 @@ func Run() {
 					endFlag = true
 				default:
 					limitrate.Wait(*can)
-					channel <- *url
+					if *filePath != "" {
+						for _, u := range urlList {
+							select {
+							case <-tt:
+								endFlag = true
+							default:
+								channel <- u
+							}
+						}
+					} else {
+						channel <- *url
+					}
 				}
 			}
 			done <- 1
 		} else {
-			for i := int64(0); i < *requests; i++ {
-				limitrate.Wait(*can)
-				channel <- *url
+			endFlag := false
+			i := int64(0)
+			for !endFlag {
+				if *filePath != "" {
+					for _, u := range urlList {
+						limitrate.Wait(*can)
+						channel <- u
+						i += 1
+						if i == *requests {
+							endFlag = true
+							break
+						}
+					}
+				} else {
+					limitrate.Wait(*can)
+					channel <- *url
+					i += 1
+					if i == *requests {
+						endFlag = true
+					}
+
+				}
 			}
 		}
 	}(l, &c)
@@ -97,11 +141,11 @@ func Run() {
 				c = http.Client{
 					Transport: &http.Transport{
 						Dial: func(nettw, addr string) (net.Conn, error) {
-							c, err := net.DialTimeout("tcp4", *proxy, time.Duration(*timeout)*time.Second)
+							if *proxy != "" {
+								addr = *proxy
+							}
+							c, err := net.DialTimeout("tcp4", addr, time.Duration(*timeout)*time.Second)
 							if err != nil {
-								if *proxy != "" {
-									addr = *proxy
-								}
 								fmt.Printf("[Q-wind] h1 dial %v proxy error,error info:%v", addr, err)
 								return nil, err
 							}
@@ -139,9 +183,9 @@ func Run() {
 							} else if resp.StatusCode >= 500 && resp.StatusCode < 600 {
 								atomic.AddInt64(&fiveXXReq, 1)
 							}
+							resp.Body.Close()
 						}
 						atomic.AddInt64(&qps, 1)
-						defer resp.Body.Close()
 					}
 					atomic.AddInt64(&process, 1)
 
@@ -152,11 +196,7 @@ func Run() {
 			atomic.AddInt64(&alive, -1)
 		}()
 	}
-
-	//table := tablewriter.NewWriter(os.Stdout)
-	//table.SetAlignment(tablewriter.ALIGN_LEFT)
-	//table.SetHeader([]string{"Elapsed", "total", "Completed", "Requests per second [sed]", "Failed requests", "Clients", "Duration"})
-	fmt.Printf("|%-10s|%-10s|%-10s|%-30s|%-20s|%-10s|%-10s|\n", "Elapsed", "total", "Completed", "Requests per second [sed]", "Failed requests", "Clients", "Duration")
+	fmt.Printf("|%-10s|%-10s|%-10s|%-30s|%-20s|%-20s|%-10s|%-10s|\n", "Elapsed", "total", "Completed", "Requests per second [sed]", "Failed requests", "5xx requests", "Clients", "Duration")
 	go func() {
 		for t := range ticker.C {
 			elapsed := time.Since(t1)
@@ -176,17 +216,13 @@ func Run() {
 			}
 			rDurTime := "+" + strconv.FormatInt(sample, 10) + "s"
 			dur, _ := time.ParseDuration(rDurTime)
-			fmt.Printf("|%-10s|%-10s|%-10s|%-30s|%-20s|%-10s|%-10s|\n", fmt.Sprintf("%0.1fs", elapsed.Seconds()), fmt.Sprintf("%v", total),
-				fmt.Sprintf("%v", doneReq), fmt.Sprintf("%v", reqPerSec), fmt.Sprintf("%v", failedReqPerSec),
-				fmt.Sprintf("%v", alive), fmt.Sprintf("%v", dur))
 			if process == total {
 				done <- 1
 				break
 			}
-			//table.Append([]string{fmt.Sprintf("%0.1fs", elapsed.Seconds()), fmt.Sprintf("%v", total),
-			//	fmt.Sprintf("%v", doneReq), fmt.Sprintf("%v", reqPerSec), fmt.Sprintf("%v", failedReqPerSec),
-			//	fmt.Sprintf("%v", alive), fmt.Sprintf("%v", dur)})
-			//table.Render()
+			fmt.Printf("|%-10s|%-10s|%-10s|%-30s|%-20s|%-20s|%-10s|%-10s|\n", fmt.Sprintf("%0.1fs", elapsed.Seconds()), fmt.Sprintf("%v", total),
+				fmt.Sprintf("%v", doneReq), fmt.Sprintf("%v", reqPerSec), fmt.Sprintf("%v", failedReqPerSec), fmt.Sprintf("%v", fiveXXReq),
+				fmt.Sprintf("%v", alive), fmt.Sprintf("%v", dur))
 		}
 	}()
 	<-done

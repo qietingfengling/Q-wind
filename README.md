@@ -2,7 +2,7 @@
 
 ## Description
 
-S-wing is a request pressure test , written in golang.
+Q-wing is a request pressure test , written in golang.
 It can customize the number of requests, pressure measurement time, header, proxy, protocols and suites.
 
 ## Usage of Q-wind

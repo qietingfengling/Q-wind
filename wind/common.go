@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 )
+
 var Binary = `
 +-+-+-+-+-+-+
 |Q|-|w|i|n|d|
@@ -47,7 +48,8 @@ var (
 	method      = flagSet.String("m", "GET", "Request Method,[GET,HEAD,POST],Default GET")
 	protocol    = flagSet.String("p", "h1", "Request Method,[h1,h2],Default  h1")
 	proxy       = flagSet.String("x", "", "proxy:port ,proxy server and port number to use")
-	heard       = flagSet.String("H", "", "header")
+	heard       = flagSet.String("H", "", "Add Arbitrary header line, eg. 'Accept-Encoding: gzip")
+	filePath    = flagSet.String("f", "", "File path.Multiple URIs can be specified in file.")
 )
 
 func init() {
